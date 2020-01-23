@@ -1,14 +1,21 @@
+param (
+    $configuration = ".\config.ps1"
+)
+
 function Main {
+    param (
+        $configuration
+    )
     # Import config
-    . ".\config.ps1"
+    . $configuration
 
     # Exec rclone
     function Send-Source2Distination {
         param (
             $target_filename,
-            $distination_directory,
             $source_path_prefix,
-            $distination_path_prefix
+            $distination_path_prefix,
+            $distination_directory
         )
         $source_path = $source_path_prefix + $target_filename
         $distination_path = $distination_path_prefix + $distination_directory
@@ -16,6 +23,25 @@ function Main {
         $result = $LASTEXITCODE
         Write-Output $result
         return
+    }
+
+    # Find files at specified month in source folder
+    function Find-SpecifiedMonthFiles {
+        param (
+            $target_date,
+            $source_path_prefix,
+            $time_format
+        )
+        $result = New-Object System.Collections.Generic.List[string]
+        $source_file_list = rclone --config rclone.conf lsf --format "tp" $source_path_prefix
+        for ($i = 0; $i -lt $source_file_list.Count; $i++) {
+            $file_time_stamp_string = $source_file_list[$i].Split(";")[0]
+            $file_time_stamp = [DateTime]::ParseExact($file_time_stamp_string, $time_format, $null)
+            if ($file_time_stamp.month -eq $target_date.month) {
+                $result.Add($source_file_list[$i])
+            }
+        }
+        Write-Output $result
     }
 
     # Webhook notification
@@ -38,36 +64,33 @@ function Main {
 
     # Start from this day (1st of last month)
     $today = Get-Date
-    $lastmonth = $today.AddMonths(-1)
-    $target_month_string = $lastmonth.ToString("yyyyMMdd").Substring(0, 6)
-    $target_date_string = $target_month_string + "01"
-    $target_date = [DateTime]::ParseExact($target_date_string, "yyyyMMdd", $null)
-    $distination_directory = $lastmonth.ToString("yyyy") + "/" + $lastmonth.ToString("MM") + "/"
-
-    # Continue downloading to less than this day (end of last month)
-    $this_month_1st_string = $today.ToString("yyyyMMdd").Substring(0, 6) + "01"
-    $this_month_1st = [DateTime]::ParseExact($this_month_1st_string, "yyyyMMdd", $null)
+    $last_month = $today.AddMonths(-1)
+  
 
     # Failed file list
     $failers = New-Object System.Collections.Generic.List[string]
 
     Write-Host ("Today is " + $today.ToString("yyyyMMdd"))
-    Write-Host ("Target month is " + $target_month_string)
+    Write-Host ("Target month is " + $last_month.Month)
  
-    # Upload
-    while ($target_date -lt $this_month_1st) {
-        $target_filename = $target_date.ToString("yyyyMMdd") + ".zip"
-        Write-Host ("Uploading " + $target_filename)
-        $result = Send-Source2Distination $target_filename $distination_directory $source_path_prefix $distination_path_prefix
-        if ($result -ne 0) {
-            $failers.Add($target_filename)
-            Write-Host ("Upload failed " + $target_filename)
-        }else {
-            Write-Host ("Upload success " + $target_filename)
-        }
-        $target_date = $target_date.AddDays(1)
-    }
+    # Get target file list
+    $target_file_list = Find-SpecifiedMonthFiles $last_month $source_path_prefix $time_format
 
+    # Upload
+    for ($i = 0; $i -lt $target_file_list.Count; $i++) {
+        Write-Host ("Uploading " + $target_file_list[$i])
+        $target_time_stamp = [DateTime]::ParseExact($target_file_list[$i].Split(";")[0], $time_format, $null)
+        $target_file_name = $target_file_list[$i].Split(";")[1]
+        $distination_directory = $target_time_stamp.ToString($distination_format)
+        $result = Send-Source2Distination $target_file_name $source_path_prefix $distination_path_prefix  $distination_directory
+        if ($result -ne 0) {
+            $failers.Add($target_file_list[$i])
+            Write-Host ("Upload failed " + $target_file_list[$i])
+        }else {
+            Write-Host ("Upload success " + $target_file_list[$i])
+        }
+    }
+    
     # Notification
     if ($failers.Count -ne 0) {
         $title = $failers.Count.ToString() + " files failed."
@@ -82,9 +105,10 @@ function Main {
         Write-Host $text
     }else {
         Write-Host "All files uploaded successfully"
+        Send-Message2Webhook $webhook_uri "Successed" "All files uploaded"
     }
 }
 
 Start-Transcript ((Get-Date).Tostring("yyyyMMdd")+".log") -Append
-Main
+Main $configuration
 Stop-Transcript

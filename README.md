@@ -2,7 +2,7 @@
 
 ## 概要
 
-Rcloneで実行時の先月一ヶ月分の"yyyyMMdd.zip"という名前のファイルを転送するツールです。
+Rcloneでタイムスタンプが実行時の先月になっているファイルを転送するツールです。
 
 ## 開発環境
 
@@ -30,6 +30,8 @@ Rcloneで実行時の先月一ヶ月分の"yyyyMMdd.zip"という名前のファ
 ```
 $source_path_prefix = "sftp:/dairy-logs/"
 $distination_path_prefix = "cloud-storage:/archive/dairy-logs/"
+$distination_format = "yyyy/MM/"
+$time_format = "yyyy-MM-dd hh:mm:ss"
 $webhook_uri = "https://example.com/webhook/foobar"
 ```
 
