@@ -1,4 +1,4 @@
-function main {
+function Main {
     # Import config
     . ".\config.ps1"
 
@@ -86,5 +86,5 @@ function main {
 }
 
 Start-Transcript ((Get-Date).Tostring("yyyyMMdd")+".log") -Append
-main
+Main
 Stop-Transcript
