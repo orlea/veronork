@@ -44,6 +44,22 @@ function Main {
         Write-Output $result
     }
 
+    # Generate target filename
+    function Edit-SpecifiedFileName {
+        param (
+            $target_date,
+            $time_format
+        )
+        $result = New-Object System.Collections.Generic.List[string]
+        $target_month_1st = [DateTime]::ParseExact($target_date.Tostring($time_format).Substring(0, 6) + "01", $time_format, $null)
+        $check_date = $target_month_1st
+        while ($target_date.Month -eq $check_date.Month) {
+            $result.Add($check_date.Tostring($time_format) + ".zip")
+            $check_date = $check_date.AddDays(1)
+        }
+        Write-Output $result
+    }
+
     # Webhook notification
     function Send-Message2Webhook {
         param (
@@ -65,7 +81,6 @@ function Main {
     # Start from this day (1st of last month)
     $today = Get-Date
     $last_month = $today.AddMonths(-1)
-  
 
     # Failed file list
     $failers = New-Object System.Collections.Generic.List[string]
@@ -73,15 +88,29 @@ function Main {
     Write-Host ("Today is " + $today.ToString("yyyyMMdd"))
     Write-Host ("Target month is " + $last_month.Month)
  
-    # Get target file list
-    $target_file_list = Find-SpecifiedMonthFiles $last_month $source_path_prefix $time_format
+    # Get target file list.
+    # *data format*
+    # For a timestamp, the format is "date; file name"
+    # For a file name, only the file name is included.
+    if ($findscheme -eq "timestamp") {
+        $target_file_list = Find-SpecifiedMonthFiles $last_month $source_path_prefix $time_format
+    }elseif ($findscheme -eq "filename") {
+        $target_file_list = Edit-SpecifiedFileName $last_month $time_format
+    }
 
     # Upload
     for ($i = 0; $i -lt $target_file_list.Count; $i++) {
         Write-Host ("Uploading " + $target_file_list[$i])
-        $target_time_stamp = [DateTime]::ParseExact($target_file_list[$i].Split(";")[0], $time_format, $null)
-        $target_file_name = $target_file_list[$i].Split(";")[1]
-        $distination_directory = $target_time_stamp.ToString($distination_format)
+
+        if ($findscheme -eq "timestamp") {
+            $target_time_stamp = [DateTime]::ParseExact($target_file_list[$i].Split(";")[0], $time_format, $null)
+            $target_file_name = $target_file_list[$i].Split(";")[1]
+            $distination_directory = $target_time_stamp.ToString($distination_format)
+        }elseif ($findscheme -eq "filename") {
+            $target_file_name = $target_file_list[$i]
+            $distination_directory = $last_month.ToString($distination_format)
+        }
+    
         $result = Send-Source2Distination $target_file_name $source_path_prefix $distination_path_prefix  $distination_directory
         if ($result -ne 0) {
             $failers.Add($target_file_list[$i])
@@ -98,14 +127,19 @@ function Main {
         for ($i = 1; $i -lt $failers.Count; $i++) {
             $text = $text + ", " + $failers[$i]
         }
-        if($webhook_uri){
-            Send-Message2Webhook $webhook_uri $title $text
-        }
         Write-Host "Uploading of these files failed"
         Write-Host $text
     }else {
+        $title = $target_file_list.Count.ToString() + " files successed."
+        $text = $target_file_list[0]
+        for ($i = 1; $i -lt $target_file_list.Count; $i++) {
+            $text = $text + ", " + $target_file_list[$i]
+        }
         Write-Host "All files uploaded successfully"
-        Send-Message2Webhook $webhook_uri "Successed" "All files uploaded"
+        Write-Host $text
+    }
+    if($webhook_uri){
+        Send-Message2Webhook $webhook_uri $title $text
     }
 }
 

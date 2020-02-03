@@ -2,7 +2,7 @@
 
 ## 概要
 
-Rcloneでタイムスタンプが実行時の先月になっているファイルを転送するツールです。
+Rcloneでタイムスタンプが実行時の先月になっているファイル、もしくはファイル名がyyyyMMdd.zipとなっているファイルを転送するツールです。
 
 ## 開発環境
 
@@ -28,6 +28,7 @@ Rcloneでタイムスタンプが実行時の先月になっているファイ�
 
 例
 ```
+$findscheme = "timestamp"
 $source_path_prefix = "sftp:/dairy-logs/"
 $distination_path_prefix = "cloud-storage:/archive/dairy-logs/"
 $distination_format = "yyyy/MM/"
