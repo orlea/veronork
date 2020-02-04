@@ -21,7 +21,7 @@ function Main {
         )
         $source_path = $source_path_prefix + $target_filename
         $distination_path = $distination_path_prefix + $distination_directory
-        rclone --config rclone.conf copy $source_path $distination_path --progress --ignore-existing
+        rclone --config rclone.conf copy $source_path $distination_path --ignore-existing
         $result = $LASTEXITCODE
         Write-Output $result
         return
