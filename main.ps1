@@ -6,7 +6,9 @@ function Main {
     param (
         $configuration
     )
-    # Import config
+    # Start main script
+    Write-Host "Start script"
+    Write-Host "Import configuration..."
     . $configuration
 
     # Exec rclone
@@ -74,16 +76,16 @@ function Main {
         Invoke-RestMethod -Uri $webhook_uri -Method Post -Body $body -ContentType 'application/json'
     }
 
-    # Start main script
-    Write-Host "Start script"
+  
     Write-Host "Initializing..."
 
     # Start from this day (1st of last month)
     $today = Get-Date
     $last_month = $today.AddMonths(-1)
 
-    # Failed file list
+    # result file list
     $failers = New-Object System.Collections.Generic.List[string]
+    $successes = New-Object System.Collections.Generic.List[string]
 
     Write-Host ("Today is " + $today.ToString("yyyyMMdd"))
     Write-Host ("Target month is " + $last_month.Month)
@@ -116,31 +118,31 @@ function Main {
             $failers.Add($target_file_list[$i])
             Write-Host ("Upload failed " + $target_file_list[$i])
         }else {
+            $successes.Add($target_file_list[$i])
             Write-Host ("Upload success " + $target_file_list[$i])
         }
     }
     
     # Notification
     if ($failers.Count -ne 0) {
-        $title = $failers.Count.ToString() + " files failed."
-        $text = $failers[0]
-        for ($i = 1; $i -lt $failers.Count; $i++) {
-            $text = $text + ", " + $failers[$i]
-        }
-        Write-Host "Uploading of these files failed"
-        Write-Host $text
+        $title = "Failed these " + $failers.Count.ToString() + "files"
+        $text = "Please check log file"
+        Write-Host $title
+        Write-Host $failers
     }else {
-        $title = $target_file_list.Count.ToString() + " files successed."
-        $text = $target_file_list[0]
-        for ($i = 1; $i -lt $target_file_list.Count; $i++) {
-            $text = $text + ", " + $target_file_list[$i]
-        }
-        Write-Host "All files uploaded successfully"
-        Write-Host $text
+        $title = "All files uploaded successfully"
+        $text = "Please check distination"
+        Write-Host $title
     }
+    Write-Host "Successed these " + $successes.Count.ToString() + "files"
+    Write-Host $successes
+
     if($webhook_uri){
+        Write-Host "Send webhook notification"
         Send-Message2Webhook $webhook_uri $title $text
     }
+
+    Write-Host "Script finished"
 }
 
 Start-Transcript ((Get-Date).Tostring("yyyyMMdd")+".log") -Append
